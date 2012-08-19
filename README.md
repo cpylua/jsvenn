@@ -9,6 +9,7 @@ Inspired by Google Chart API Venn Chart. This is a minimal implementation. Suppo
 Usage
 ======
 **Requires Raphael.js**
+**Written in CoffeeScript, the JavaScript files are auto generated. DO NOT edit them.**
 
     <script type="text/javascript" src="raphael-min.js"></script>
     <script type="text/javascript" src="../lib/venn.js"></script>
