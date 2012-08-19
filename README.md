@@ -3,7 +3,7 @@ Area proportional Venn diagram for JavaScript
 Inspired by Google Chart API Venn Chart. This is a minimal implementation. It only draws circles with areas proportional to their weights. Data label is not supported.
 
 + You can customize circle fill color and opacity.
-+ Graph height is customizable, however graph width is not. It is calculated on the fly.
++ Largest circle radius is customizable, smaller circle radiuses and graph width/height is calculated on the fly.
 
 Usage
 ======
@@ -11,10 +11,10 @@ Usage
 
     <script type="text/javascript" src="raphael-min.js"></script>
     <script type="text/javascript" src="../lib/venn.js"></script>
-      
+
     venn("container", {cards: [100, 200], overlap: 50});
-    venn("container", {cards: [100, 200], overlap: 50}, 100);
-    venn("container", {cards: [100, 200], overlap: 50}, 100, {
+    venn("container", {cards: [100, 200], overlap: 50}, 50);
+    venn("container", {cards: [100, 200], overlap: 50}, 75, {
       fill: {left: "#FF6633", right: "#7FC633"},
       "fill-opacity": {left: 0.8, right: 0.8}
     });

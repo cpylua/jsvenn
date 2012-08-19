@@ -9,3 +9,7 @@ task 'build-test', 'build tests', ->
 task 'all', 'build all', ->
   invoke 'build'
   invoke 'build-test'
+
+task 'watch', 'watch changes', ->
+  exec "coffee -w -o lib -c src/venn.coffee"
+  exec "coffee -w -o html -c test/venn-test.coffee"
