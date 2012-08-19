@@ -1,6 +1,6 @@
 ###
 container: DOM element or its ID for canvas
-weights: area weights, {cards: [100, 200], overlap: 50}
+weights: area weights, {cards: [100, 200], overlap: 50, labels: ['X', 'Y']}
 baseRadius: largest circle radius
 opts: drawing options
 
@@ -9,11 +9,13 @@ NOTE: the bigger circle is always drawn on the left
 
 g_margin = 2
 g_threshold = 0.1
+g_fontFamily = "Corbel, 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', 'DejaVu Sans', 'Bitstream Vera Sans', 'Liberation Sans', Verdana, 'Verdana Ref', sans-serif"
+g_fontSize = 11
 
 venn2 = (container, weights, baseRadius = 100, opts) ->
   opts = opts or {
-    fill: {left: "#FF6633", right: "#7FC633"}   # circle fill color
-    "fill-opacity": {left: 0.8, right: 0.8}     # circle opacities
+    fill: ["#FF6633", "#7FC633"]   # circle fill color for A, B in order
+    "fill-opacity": [0.8, 0.8]     # circle opacities for A, B in order
   }
 
   height = (baseRadius + g_margin) * 2
@@ -23,11 +25,19 @@ venn2 = (container, weights, baseRadius = 100, opts) ->
   radiuses = calcRadiuses height, weights.cards
   interArea = scaleIntersection weights, Math.max radiuses...
   distance = findDistance radiuses, interArea
-  draw2 paper, height, radiuses, distance, opts
+
+  # fix parameter order because radius is sorted in descending order
+  labels = weights.labels?[..]
+  if weights.cards[0] < weights.cards[1]
+    labels?.reverse()
+    opts.fill.reverse()
+    opts["fill-opacity"].reverse()
+
+  draw2 paper, height, radiuses, distance, opts, labels
 
 ###
 container: DOM element or its ID for canvas
-weights: area weights, {cards: [A, B, C], overlap: [AB, AC, BC]}
+weights: area weights, {cards: [A, B, C], overlap: [AB, AC, BC], labels:["A", "B", "C"]}
 baseRadius: largest circle radius
 opts: drawing options
 
@@ -49,7 +59,7 @@ venn3 = (container, weights, baseRadius = 100, opts) ->
   radiuses = calcRadiuses3 diameter, weights.cards
   interAreas = scaleIntersection3 weights.overlap, baseRadius, Math.max weights.cards...
   distances = findDistance3 radiuses, interAreas
-  draw3 paper, radiuses, distances, interAreas, opts
+  draw3 paper, radiuses, distances, interAreas, opts, weights.labels
 
 
 
@@ -59,7 +69,7 @@ helpers for venn2
 
 # Calculate the radius so that circle area is proportional to weights 
 calcRadiuses = (maxDiameter, cards) ->
-  [big, small] = if cards[0] > cards[1] then cards else cards.reverse()
+  [big, small] = if cards[0] > cards[1] then cards else cards[..].reverse()
   r = maxDiameter / 2.0 - g_margin
   [r, r * Math.sqrt small / big]
 
@@ -105,26 +115,60 @@ findDistance = (radiuses, interArea) ->
     d = (upper + lower) / 2.0
   d   # the distance we found
 
-draw2 = (paper, height, radiuses, distance, opts) ->
+# WARNING: ugly drawing code
+draw2 = (paper, height, radiuses, distance, opts, labels) ->
   [cxleft, cyleft] = [radiuses[0] + g_margin, radiuses[0] + g_margin]
   [cxright, cyright] = [cxleft + distance, cyleft]
   left = paper.circle cxleft, cyleft, radiuses[0]
   left.attr {
     "stroke-width": 0
-    fill: opts.fill.left
-    "fill-opacity": opts["fill-opacity"].left
+    fill: opts.fill[0]
+    "fill-opacity": opts["fill-opacity"][0]
   }
   right = paper.circle cxright, cyright, radiuses[1]
   right.attr {
     "stroke-width": 0
-    fill: opts.fill.right
-    "fill-opacity": opts["fill-opacity"].right      
+    fill: opts.fill[1]
+    "fill-opacity": opts["fill-opacity"][1]    
   }
 
-  # set paper size based on final results
+  # draw labels and resize paper
   rbb = right.getBBox()
-  w = rbb.x2 + g_margin
-  paper.setSize w, height
+  w = rbb.x2
+  if labels?
+    height = 30 if height < 30 # at least 30px high
+
+    tx = w + 10
+    ty1 = (height - 23) / 2.0
+    ty2 = (height + 3) / 2.0
+    r1 = paper.rect tx, ty1, 10, 10
+    r2 = paper.rect tx, ty2, 10, 10
+    r1.attr {
+      "stroke-width": 0
+      fill: opts.fill[0]
+      "fill-opacity": opts["fill-opacity"][0]
+    }
+    r2.attr {
+      "stroke-width": 0
+      fill: opts.fill[1]
+      "fill-opacity": opts["fill-opacity"][1]
+    }
+    t1 = paper.text tx + 13, ty1 + 5, labels[0]
+    t2 = paper.text tx + 13, ty2 + 5, labels[1]
+    texts = [t1, t2]
+    for t in texts
+      t.attr {
+        "text-anchor": "start"
+        "font-family": g_fontFamily
+        "font-size": g_fontSize
+      }
+
+    # calculate paper size
+    bbs = (t.getBBox() for t in texts)
+    rightEdges = (bb.x2 for bb in bbs)
+    w = Math.max(rightEdges...)
+  
+  paper.setSize w + g_margin, height
 
 
 ###
@@ -209,7 +253,10 @@ findAngle = (r1, r2, d1, d2, area) ->
     d = (upper + lower) / 2.0
   Math.acos (Math.pow(d1, 2) + Math.pow(d2, 2) - Math.pow(d, 2)) / (2 * d1 * d2)
 
-draw3 = (paper, radiuses, distances, areas, opts) ->
+# WARNING: ugly drawing code
+draw3 = (paper, radiuses, distances, areas, opts, labels) ->
+  console.log labels
+
   # draw the largest one first
   index = distances.maxIndex
   r = radiuses[index]
@@ -290,7 +337,47 @@ draw3 = (paper, radiuses, distances, areas, opts) ->
       cx: c.attr("cx") - topx + g_margin
       cy: c.attr("cy") - topy + g_margin
     }
+
+  # draw labels and resize paper
+  if labels?
+    h = 40 if h < 40 # at least 40px high
+
+    # rects with color
+    rx = w + 10
+    ry1 = (h - 36) / 2.0
+    ry2 = (h - 10) / 2.0
+    ry3 = (h + 16) / 2.0
+    r1 = paper.rect rx, ry1, 10, 10
+    r2 = paper.rect rx, ry2, 10, 10
+    r3 = paper.rect rx, ry3, 10, 10
+    rects = [r1, r2, r3]
+    for i in [0...3]
+      rects[i].attr {
+        "stroke-width": 0
+        fill: opts.fill[i]
+        "fill-opacity": opts["fill-opacity"][i]
+      }
+
+    # labels
+    t1 = paper.text rx + 13, ry1 + 5, labels[0]
+    t2 = paper.text rx + 13, ry2 + 5, labels[1]
+    t3 = paper.text rx + 13, ry3 + 5, labels[2]
+    texts = [t1, t2, t3]
+    for t in texts
+      t.attr {
+        "text-anchor": "start"
+        "font-family": g_fontFamily
+        "font-size": g_fontSize
+      }
+
+    # calculate paper size
+    bbs = (t.getBBox() for t in texts)
+    rightEdges = (bb.x2 for bb in bbs)
+    w = Math.max(rightEdges...) + g_margin
+  
   paper.setSize w, h
+
+
   
 
 # export venn
