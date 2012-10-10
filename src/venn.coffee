@@ -132,9 +132,7 @@ isFiniteNumber = (obj) -> isNumber(obj) and isFinite(obj)
 
 isValidAngles = (angles) ->
   for a in angles
-    unless isFiniteNumber(a)
-      console.log angles
-      return false
+    return false unless isFiniteNumber(a)
   true
 
 # WARNING: ugly drawing code
@@ -283,8 +281,6 @@ findAngle = (r1, r2, d1, d2, area) ->
 
 # WARNING: ugly drawing code
 draw3 = (paper, radiuses, distances, areas, opts, labels) ->
-  console.log radiuses, distances, areas
-
   # draw the largest one first
   index = distances.maxIndex
   r = radiuses[index]
