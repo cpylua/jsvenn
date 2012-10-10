@@ -21,10 +21,6 @@ venn2 = (container, weights, baseRadius = 100, opts) ->
   height = (baseRadius + g_margin) * 2
   width = height * 2 # canvas width to fit all, it will be shinked
   paper = Raphael container, width, height
-  normalizeWeights weights
-  radiuses = calcRadiuses height, weights.cards
-  interArea = scaleIntersection weights, Math.max radiuses...
-  distance = findDistance radiuses, interArea
 
   # fix parameter order because radius is sorted in descending order
   labels = weights.labels?[..]
@@ -32,6 +28,12 @@ venn2 = (container, weights, baseRadius = 100, opts) ->
     labels?.reverse()
     opts.fill.reverse()
     opts["fill-opacity"].reverse()
+
+  # graph layout
+  normalizeWeights weights
+  radiuses = calcRadiuses height, weights.cards
+  interArea = scaleIntersection weights, Math.max radiuses...
+  distance = findDistance radiuses, interArea
 
   draw2 paper, height, radiuses, distance, opts, labels
 
@@ -71,10 +73,12 @@ helpers for venn2
 calcRadiuses = (maxDiameter, cards) ->
   [big, small] = if cards[0] > cards[1] then cards else cards[..].reverse()
   r = maxDiameter / 2.0 - g_margin
-  [r, r * Math.sqrt small / big]
+  if big > 0 then [r, r * Math.sqrt small / big] else [0, 0]
 
-# fix overlap
+# fix invalid set size and overlap
 normalizeWeights = (weights) ->
+  for item, idx in weights.cards
+    weights.cards[idx] = 0 if item < 0
   maxOverlap = Math.min weights.cards...
   weights.overlap = maxOverlap if maxOverlap < weights.overlap
   weights.overlap = 0 if weights.overlap < 0
@@ -83,20 +87,26 @@ normalizeWeights = (weights) ->
 intersectionArea = (radiuses, angles) ->
   [r1, r2] = radiuses
   [alpha, beta] = angles
+  if alpha is Math.PI and beta is Math.PI # one circle is contained in another
+    r = Math.min r1, r2
+    return Math.PI * Math.pow(r, 2)
   area = (r, angle) -> 0.5 * Math.pow(r, 2) * (angle - Math.sin angle)
   area(r1, alpha) + area(r2, beta)
 
 # distance: the distance between two circle centers
 calcAngles = (radiuses, distance) ->
   angle = (r1, r2, d) ->
+    sum = r1 + r2 + d
+    max = Math.max r1, r2, d
+    return Math.PI if max * 2 >= sum # not a triangle
     2 * Math.acos (Math.pow(d, 2) + Math.pow(r1, 2) - Math.pow(r2, 2)) / (2 * r1 * d)
   [r1, r2] = radiuses
-  [angle(r1, r2, distance), angle(r2, r1, distance)]
+  if distance is 0 then [Math.PI, Math.PI] else [angle(r1, r2, distance), angle(r2, r1, distance)]
 
 # Scale intersection weight to graph area
 scaleIntersection = (weights, radius) ->
   big = Math.max weights.cards...
-  Math.PI * Math.pow(radius, 2) * weights.overlap / big
+  if big is 0 then 0 else Math.PI * Math.pow(radius, 2) * weights.overlap / big
 
 # The left circle is fixed at (0, 0), find the position
 # for the right circle so that their intersection area is proportional
@@ -108,12 +118,24 @@ findDistance = (radiuses, interArea) ->
   d = (upper + lower) / 2.0
   while true
     angles = calcAngles radiuses, d
+    return 0 unless isValidAngles angles # avoid infinite loop
     area = intersectionArea radiuses, angles
     delta = area - interArea
     break if Math.abs(delta) < g_threshold
     if delta < 0 then upper = d else lower = d
     d = (upper + lower) / 2.0
   d   # the distance we found
+
+
+isNumber = (obj) -> Object.prototype.toString.call(obj) is "[object Number]"
+isFiniteNumber = (obj) -> isNumber(obj) and isFinite(obj)
+
+isValidAngles = (angles) ->
+  for a in angles
+    unless isFiniteNumber(a)
+      console.log angles
+      return false
+  true
 
 # WARNING: ugly drawing code
 draw2 = (paper, height, radiuses, distance, opts, labels) ->
@@ -133,8 +155,8 @@ draw2 = (paper, height, radiuses, distance, opts, labels) ->
   }
 
   # draw labels and resize paper
-  rbb = right.getBBox()
-  w = rbb.x2
+  bbs = [right.getBBox(), left.getBBox()]
+  w = Math.max (bb.x2 for bb in bbs)...
   if labels?
     height = 30 if height < 30 # at least 30px high
 
@@ -177,6 +199,8 @@ Helpers for venn3
 
 # normalize 3-set weights
 normalizeWeights3 = (weights) ->
+  for item, idx in weights.cards
+    weights.cards[idx] = 0 if item < 0
   [ab, ac, bc] = weights.overlap
   [a, b, c] = weights.cards
   abMin = Math.min a, b
@@ -194,11 +218,13 @@ normalizeWeights3 = (weights) ->
 calcRadiuses3 = (maxDiameter, cards) ->
   maxWeight = Math.max cards...
   r = maxDiameter / 2.0
-  (r * Math.sqrt(weight / maxWeight) for weight in cards)
+  if maxWeight is 0 then [0, 0, 0] else (r * Math.sqrt(weight / maxWeight) for weight in cards)
 
 # scale the intersection areas
 scaleIntersection3 = (overlap, maxRadius, maxWeight) ->
-  (Math.PI * Math.pow(maxRadius, 2) * weight / maxWeight for weight in overlap)
+  scale = (weight) ->
+    if maxWeight is 0 then 0 else Math.PI * Math.pow(maxRadius, 2) * weight / maxWeight
+  (scale weight for weight in overlap)
 
 # The biggest circle is fixed at (0, 0), find the position
 # so that the intersection area between the biggest and
@@ -238,6 +264,7 @@ findAngle = (r1, r2, d1, d2, area) ->
   # area is larger than maximium possible value
   radiuses = if r1 > r2 then [r1, r2] else [r2, r1]
   angles = calcAngles radiuses, Math.abs(d1 - d2)
+  return 0 unless isValidAngles angles
   maxArea = intersectionArea radiuses, angles
   return 0 if maxArea <= area
 
@@ -246,6 +273,7 @@ findAngle = (r1, r2, d1, d2, area) ->
   d = (upper + lower) / 2.0
   while true
     angles = calcAngles radiuses, d
+    return 0 unless isValidAngles angles
     inter = intersectionArea radiuses, angles
     delta = inter - area
     break if Math.abs(delta) < g_threshold
@@ -255,7 +283,7 @@ findAngle = (r1, r2, d1, d2, area) ->
 
 # WARNING: ugly drawing code
 draw3 = (paper, radiuses, distances, areas, opts, labels) ->
-  console.log labels
+  console.log radiuses, distances, areas
 
   # draw the largest one first
   index = distances.maxIndex
@@ -376,8 +404,6 @@ draw3 = (paper, radiuses, distances, areas, opts, labels) ->
     w = Math.max(rightEdges...) + g_margin
   
   paper.setSize w, h
-
-
   
 
 # export venn

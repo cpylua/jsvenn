@@ -3,6 +3,21 @@
 
   window.onload = function() {
     venn2("container", {
+      cards: [100, 100],
+      overlap: 0,
+      labels: ["100", "100"]
+    });
+    venn2("container", {
+      cards: [0, 100],
+      overlap: 0,
+      labels: ["0", "100"]
+    });
+    venn2("container", {
+      cards: [0, 0],
+      overlap: 0,
+      labels: ["0", "0"]
+    });
+    venn2("container", {
       cards: [100, 200],
       overlap: 50
     }, 75);
@@ -81,9 +96,24 @@
       cards: [100, 200, 80],
       overlap: [0, 40, 0]
     });
-    return venn3("container", {
+    venn3("container", {
       cards: [100, 200, 80],
       overlap: [0, 0, 0]
+    });
+    venn3("container", {
+      cards: [0, 200, 150],
+      overlap: [40, 40, 40],
+      labels: ["0", "200", "150"]
+    });
+    venn3("container", {
+      cards: [100, 0, 0],
+      overlap: [40, 40, 40],
+      labels: ["100", "0", "0"]
+    });
+    return venn3("container", {
+      cards: [0, 0, 0],
+      overlap: [40, 40, 40],
+      labels: ["0", "0", "0"]
     });
   };
 
